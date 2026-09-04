@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/zalo-callback",
+      "destination": "https://pwbsgyrvbsqobhocupcw.supabase.co/functions/v1/zalo-oa-oauth-callback"
+    },
+    {
+      "source": "/zalo-oa-callback",
+      "destination": "https://pwbsgyrvbsqobhocupcw.supabase.co/functions/v1/zalo-oa-oauth-callback"
+    }
+  ]
+}
