@@ -1,0 +1,8 @@
+{
+  "name": "local-zalo-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

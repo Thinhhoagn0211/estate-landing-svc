@@ -1,0 +1,40 @@
+name: Keep Supabase active
+
+on:
+  schedule:
+    # Run once daily at 03:17 UTC. The non-zero minute avoids GitHub's busiest
+    # scheduled-workflow window, when jobs can be delayed.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Query Supabase database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$SUPABASE_URL" || { echo 'Missing SUPABASE_URL secret.' >&2; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo 'Missing SUPABASE_SERVICE_ROLE_KEY secret.' >&2; exit 1; }
+
+          curl --fail --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --get "$SUPABASE_URL/rest/v1/listings" \
+            --data-urlencode 'select=id' \
+            --data-urlencode 'limit=1' \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Accept: application/json' \
+            --output /dev/null
+
+          echo 'Supabase database activity ping succeeded.'

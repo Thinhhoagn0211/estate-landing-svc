@@ -1,0 +1,32 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.zaloshare'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.zaloshare"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Official Zalo Android SDK (developers.zalo.me) — resolves via Maven Central,
+  // verified against the "me.zalo" group (the old com.zing.zalo.zalosdk.kotlin
+  // Bintray-published artifacts are dead since Bintray shut down in 2021).
+  //
+  // `api` (not `implementation`) because the app's own MainApplication.kt calls
+  // ZaloSDKApplication.wrap(this) directly (added by app.plugin.js per Zalo's
+  // integration guide step 4) — it needs these classes on its own classpath,
+  // not just zalo-share's.
+  api "me.zalo:sdk-core:+"
+  api "me.zalo:sdk-auth:+"
+  api "me.zalo:sdk-openapi:+"
+}
