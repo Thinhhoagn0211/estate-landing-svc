@@ -19,8 +19,9 @@ import ListingDetail from '../screens/ListingDetail'
 import Inbox from '../screens/Inbox'
 import Analytics from '../screens/Analytics'
 import Profile from '../screens/Profile'
-import Subscription from '../screens/Subscription'
 import Settings from '../screens/Settings'
+import StartCreate from '../screens/StartCreate'
+import ManageListing from '../screens/ManageListing'
 
 const AuthStackNav = createNativeStackNavigator()
 const MainStackNav = createNativeStackNavigator()
@@ -43,12 +44,13 @@ function MainStack({ needsOnboarding }) {
       <MainStackNav.Screen name="EmptyState" component={EmptyState} options={{ animation: 'slide_from_right' }} />
       <MainStackNav.Screen name="Listings" component={Listings} />
       <MainStackNav.Screen name="ListingDetail" component={ListingDetail} options={{ animation: 'slide_from_right' }} />
+      <MainStackNav.Screen name="ManageListing" component={ManageListing} options={{ animation: 'slide_from_right' }} />
       <MainStackNav.Screen name="Inbox" component={Inbox} />
       <MainStackNav.Screen name="Analytics" component={Analytics} options={{ animation: 'slide_from_right' }} />
       <MainStackNav.Screen name="Profile" component={Profile} />
-      <MainStackNav.Screen name="Subscription" component={Subscription} options={{ animation: 'slide_from_right' }} />
       <MainStackNav.Screen name="Settings" component={Settings} options={{ animation: 'slide_from_right' }} />
       <MainStackNav.Screen name="ConnectChannels" component={ConnectChannels} options={{ animation: 'slide_from_right' }} />
+      <MainStackNav.Screen name="StartCreate" component={StartCreate} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
 
       {/* Create flow (3 steps) */}
       <MainStackNav.Screen name="Capture" component={Capture} options={{ animation: 'slide_from_right' }} />

@@ -1,108 +1,125 @@
-import { useState } from 'react'
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native'
+import { useCallback, useMemo, useState } from 'react'
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, TextInput, Linking, Alert, Image, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
+import * as IntentLauncher from 'expo-intent-launcher'
+import { useFocusEffect } from '@react-navigation/native'
 import TabBar from '../components/TabBar'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { colors, fonts, radius, shadow } from '../theme/tokens'
 
-const FILTERS = ['Tất cả · 9', 'Mới · 3', 'Đã liên hệ', 'Hẹn xem nhà']
+function timeAgo(iso) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+  if (minutes < 1) return 'Vừa xong'
+  if (minutes < 60) return `${minutes} phút`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} giờ`
+  const days = Math.floor(hours / 24)
+  return days < 7 ? `${days} ngày` : new Date(iso).toLocaleDateString('vi-VN')
+}
 
-const LEADS = [
-  {
-    id: 1,
-    name: 'Thu Hà',
-    initials: 'TH',
-    avatarColors: ['#dd9426', '#a86410'],
-    time: '2 phút',
-    message: 'Chào anh, căn này còn thương lượng giá không ạ?',
-    platform: 'TikTok',
-    platformBg: '#000',
-    status: 'Mới',
-    statusBg: colors.amber[50],
-    statusColor: colors.amber[700],
-  },
-  {
-    id: 2,
-    name: 'Đức Long',
-    initials: 'DL',
-    avatarColors: ['#1877f2', '#0d5b49'],
-    time: '1 giờ',
-    message: 'Mai mình xem nhà lúc 10h được không?',
-    platform: 'Facebook',
-    platformBg: '#1877f2',
-    status: 'Hẹn xem nhà',
-    statusBg: colors.jade[50],
-    statusColor: colors.jade[600],
-  },
-  {
-    id: 3,
-    name: 'Ngọc Vy',
-    initials: 'NV',
-    time: 'Hôm qua',
-    message: 'Cảm ơn anh, em đã thuê chỗ khác rồi ạ.',
-    platform: 'Zalo',
-    platformBg: '#0068ff',
-    status: 'Đã đóng',
-    statusBg: colors.sand[100],
-    statusColor: colors.sand[600],
-    closed: true,
-  },
-]
+function initials(senderId) {
+  return senderId.slice(-2).toUpperCase()
+}
 
 export default function Inbox({ navigation }) {
-  const [filter, setFilter] = useState(FILTERS[0])
+  const { user } = useAuth()
+  const [conversations, setConversations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const load = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    setError(null)
+    const { data, error: queryError } = await supabase
+      .from('messenger_conversations')
+      .select('id, page_id, sender_id, sender_name, sender_avatar_url, external_conversation_id, last_message, last_message_at')
+      .eq('user_id', user.id)
+      .order('last_message_at', { ascending: false })
+    setConversations(data ?? [])
+    if (queryError) setError('Chưa thể tải tin nhắn Messenger.')
+    setLoading(false)
+  }, [user])
+
+  useFocusEffect(useCallback(() => { load() }, [load]))
+
+  const syncHistory = async () => {
+    setSyncing(true)
+    setError(null)
+    try {
+      const { data, error: syncError } = await supabase.functions.invoke('facebook-sync-messenger')
+      if (syncError || data?.error) throw new Error(data?.error ?? syncError.message)
+      await load()
+    } catch (syncError) {
+      setError(syncError.message ?? 'Chưa thể đồng bộ lịch sử Messenger.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const visibleConversations = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return conversations
+    return conversations.filter((item) => `${item.sender_name ?? ''} ${item.last_message} ${item.sender_id}`.toLowerCase().includes(needle))
+  }, [conversations, query])
+
+  const openConversation = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        IntentLauncher.openApplication('com.facebook.orca')
+        return
+      }
+      await Linking.openURL('https://www.messenger.com/')
+    } catch {
+      Alert.alert('Chưa mở được Messenger', 'Hãy cài hoặc đăng nhập Messenger rồi thử lại.')
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.head}>
-        <Text style={styles.title}>Tin nhắn</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-          {FILTERS.map((f) => (
-            <Pressable key={f} onPress={() => setFilter(f)} style={[styles.filterChip, filter === f && styles.filterChipActive]}>
-              <Text style={[styles.filterLabel, filter === f && styles.filterLabelActive]}>{f}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <View><Text style={styles.eyebrow}>KHÁCH HÀNG</Text><Text style={styles.title}>Tin nhắn</Text><Text style={styles.subtitle}>Facebook Messenger · chạm để mở hộp thư</Text></View>
+        <View style={styles.actions}>
+          <Pressable style={styles.refresh} onPress={syncHistory} accessibilityLabel="Đồng bộ lịch sử Messenger">
+            {syncing ? <ActivityIndicator size="small" color={colors.jade[600]} /> : <Ionicons name="cloud-download-outline" size={18} color={colors.sand[700]} />}
+          </Pressable>
+          <Pressable style={styles.refresh} onPress={load} accessibilityLabel="Làm mới tin nhắn"><Ionicons name="refresh" size={18} color={colors.sand[700]} /></Pressable>
+        </View>
       </View>
 
+      <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Tìm tên hoặc nội dung tin nhắn" placeholderTextColor={colors.textMuted} style={styles.searchInput} />{!!query && <Pressable accessibilityLabel="Xóa tìm kiếm" style={styles.clear} onPress={() => setQuery('')}><Ionicons name="close-circle" size={19} color={colors.textMuted} /></Pressable>}</View>
+
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {LEADS.map((l) => (
-          <View key={l.id} style={[styles.card, l.closed && { opacity: 0.7 }]}>
-            <View style={[styles.avatar, { backgroundColor: l.avatarColors ? l.avatarColors[0] : colors.sand[500] }]}>
-              <Text style={styles.avatarLabel}>{l.initials}</Text>
-            </View>
+        {loading && <ActivityIndicator color={colors.jade[600]} style={{ marginTop: 28 }} />}
+        {!loading && visibleConversations.map((conversation) => (
+          <Pressable key={conversation.id} style={styles.card} onPress={openConversation} accessibilityLabel="Mở hộp thư Messenger">
+            <View style={styles.avatar}>{conversation.sender_avatar_url ? <Image source={{ uri: conversation.sender_avatar_url }} style={styles.avatarImage} /> : <Text style={styles.avatarLabel}>{initials(conversation.sender_name || conversation.sender_id)}</Text>}</View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={styles.rowTop}>
-                <Text style={styles.name}>{l.name}</Text>
-                <Text style={styles.time}>{l.time}</Text>
+                <Text style={styles.name} numberOfLines={1}>{conversation.sender_name || 'Khách Messenger'}</Text>
+                <Text style={styles.time}>{timeAgo(conversation.last_message_at)}</Text>
               </View>
-              <Text style={styles.message} numberOfLines={1}>
-                {l.message}
-              </Text>
-              <View style={styles.tagRow}>
-                <View style={[styles.platformTag, { backgroundColor: l.platformBg }]}>
-                  <Text style={styles.platformTagLabel}>{l.platform}</Text>
-                </View>
-                <View style={[styles.statusTag, { backgroundColor: l.statusBg }]}>
-                  <Text style={[styles.statusTagLabel, { color: l.statusColor }]}>{l.status}</Text>
-                </View>
-              </View>
+              <Text style={styles.message} numberOfLines={2}>{conversation.last_message}</Text>
+              <View style={styles.cardBottom}><View style={styles.tag}><Ionicons name="logo-facebook" size={10} color="#1877f2" /><Text style={styles.tagLabel}>Mở Messenger</Text></View><Ionicons name="open-outline" size={17} color={colors.jade[700]} /></View>
             </View>
-          </View>
+          </Pressable>
         ))}
 
-        <View style={styles.aiSuggestion}>
-          <Ionicons name="star" size={16} color={colors.jade[600]} style={{ marginTop: 1 }} />
-          <Text style={styles.aiSuggestionText}>
-            <Text style={styles.aiSuggestionStrong}>Gợi ý trả lời từ AI: </Text>
-            "Chào Thu Hà, giá vẫn có thể thương lượng một chút, mình nhắn riêng nhé!"
-          </Text>
-        </View>
+        {!loading && visibleConversations.length === 0 && !error && <View style={styles.empty}>
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color={colors.sand[500]} />
+          <Text style={styles.emptyTitle}>{query ? 'Không tìm thấy hội thoại' : 'Chưa có tin nhắn Messenger'}</Text>
+          <Text style={styles.emptyText}>{query ? 'Thử một từ khóa khác trong nội dung tin nhắn.' : 'Khi khách nhắn vào Facebook Page, hội thoại sẽ tự xuất hiện ở đây.'}</Text>
+        </View>}
+        {error && <Text style={styles.error}>{error}</Text>}
       </ScrollView>
 
-      <TabBar active="chat" onNavigate={(k) => navigateTab(navigation, k)} onCreate={() => navigation.navigate('Capture')} />
+      <TabBar active="chat" onNavigate={(key) => navigateTab(navigation, key)} />
     </SafeAreaView>
   )
 }
@@ -115,30 +132,25 @@ function navigateTab(navigation, key) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.sand[50] },
-  head: { paddingHorizontal: 20 },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  head: { paddingHorizontal: 20, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eyebrow: { color: colors.jade[600], letterSpacing: 1.1, fontFamily: fonts.displayBold, fontSize: 10 },
   title: { fontSize: 26, fontFamily: fonts.displayBold, color: colors.sand[900] },
-  filterRow: { marginTop: 12 },
-  filterChip: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.sand[300], paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.full, marginRight: 8 },
-  filterChipActive: { backgroundColor: colors.sand[900], borderColor: colors.sand[900] },
-  filterLabel: { fontFamily: fonts.displayMedium, fontSize: 12.5, color: colors.sand[700] },
-  filterLabelActive: { color: '#fff', fontFamily: fonts.displaySemiBold },
-
-  list: { padding: 20, paddingTop: 12, paddingBottom: 120, gap: 10 },
-  card: { backgroundColor: '#fff', borderRadius: radius.sheet, padding: 13, flexDirection: 'row', gap: 12, ...shadow.e1 },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 15 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subtitle: { marginTop: 2, fontSize: 12, color: colors.sand[500] },
+  actions: { flexDirection: 'row', gap: 8 }, refresh: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  search: { marginHorizontal: 20, marginTop: 16, minHeight: 52, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.borderControl, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 9 }, searchInput: { flex: 1, paddingVertical: 0, color: colors.text, fontFamily: fonts.display, fontSize: 15 }, clear: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  list: { padding: 20, paddingTop: 16, paddingBottom: 120, gap: 10 },
+  card: { backgroundColor: '#fff', borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, padding: 14, flexDirection: 'row', gap: 12 },
+  avatar: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1877f2', overflow: 'hidden' }, avatarImage: { width: '100%', height: '100%' },
+  avatarLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 14 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   name: { fontSize: 14.5, fontFamily: fonts.displayBold, color: colors.sand[900] },
   time: { fontSize: 11, color: colors.sand[500] },
-  message: { fontSize: 13, color: colors.sand[600], marginTop: 2 },
-  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  platformTag: { paddingVertical: 2, paddingHorizontal: 5, borderRadius: 4 },
-  platformTagLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 8 },
-  statusTag: { paddingVertical: 2, paddingHorizontal: 7, borderRadius: 5 },
-  statusTagLabel: { fontFamily: fonts.displayBold, fontSize: 10 },
-
-  aiSuggestion: { marginTop: 4, backgroundColor: colors.jade[50], borderWidth: 1, borderColor: colors.jade[100], borderStyle: 'dashed', borderRadius: radius.sheet, padding: 13, flexDirection: 'row', gap: 10 },
-  aiSuggestionText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: colors.jade[600] },
-  aiSuggestionStrong: { fontFamily: fonts.displaySemiBold },
+  message: { fontSize: 13, color: colors.sand[600], marginTop: 3, lineHeight: 18 },
+  cardBottom: { marginTop: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, tag: { alignSelf: 'flex-start', paddingVertical: 3, paddingHorizontal: 7, borderRadius: radius.full, backgroundColor: '#edf4ff', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tagLabel: { color: '#1877f2', fontFamily: fonts.displaySemiBold, fontSize: 9 },
+  empty: { marginTop: 18, backgroundColor: '#fff', borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, padding: 28, alignItems: 'center' },
+  emptyTitle: { marginTop: 10, fontSize: 14, fontFamily: fonts.displayBold, color: colors.sand[800] },
+  emptyText: { marginTop: 4, fontSize: 12, lineHeight: 18, color: colors.sand[500], textAlign: 'center' },
+  error: { marginTop: 12, color: colors.error, fontSize: 12 },
 })

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import FlowHeader from '../components/FlowHeader'
 import Button from '../components/Button'
 import { useListingDraft } from '../context/ListingDraftContext'
+import { persistDraftAssets } from '../lib/listingMedia'
 import { colors, fonts, radius } from '../theme/tokens'
 
 function VideoTile({ video, onRemove }) {
@@ -33,7 +34,7 @@ function VideoTile({ video, onRemove }) {
   }, [player])
 
   return (
-    <Pressable style={[styles.tile, styles.photoTile, styles.videoTile]} onLongPress={onRemove}>
+    <View style={[styles.tile, styles.photoTile, styles.videoTile]}>
       {thumbnail ? (
         <ExpoImage source={thumbnail} style={styles.tileImage} contentFit="cover" />
       ) : (
@@ -42,7 +43,10 @@ function VideoTile({ video, onRemove }) {
       <View pointerEvents="none" style={styles.videoPlayOverlay}>
         <Ionicons name="play-circle" size={34} color="#fff" />
       </View>
-    </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Xóa video" style={styles.removeButton} onPress={onRemove}>
+        <Ionicons name="close" size={16} color="#fff" />
+      </Pressable>
+    </View>
   )
 }
 
@@ -68,9 +72,12 @@ export default function Capture({ navigation }) {
       base64: true,
     })
     if (result.canceled) return
-    console.log('[Capture] picker assets:', result.assets.map((a) => ({ uri: a.uri, hasBase64: !!a.base64, base64Length: a.base64?.length, mimeType: a.mimeType })))
-    const picked = result.assets.map((a) => ({ uri: a.uri, base64: a.base64, mimeType: a.mimeType ?? 'image/jpeg' }))
-    setPhotos((prev) => [...prev, ...picked].slice(0, 12))
+    try {
+      const picked = await persistDraftAssets(result.assets.map((a) => ({ uri: a.uri, base64: a.base64, mimeType: a.mimeType ?? 'image/jpeg' })))
+      setPhotos((prev) => [...prev, ...picked].slice(0, 12))
+    } catch {
+      Alert.alert('Chưa lưu được ảnh', 'Không thể sao chép ảnh vào bản nháp. Vui lòng thử lại.')
+    }
   }
 
   const pickVideo = async () => {
@@ -81,12 +88,17 @@ export default function Capture({ navigation }) {
       quality: 0.7,
     })
     if (result.canceled) return
-    const picked = result.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType ?? 'video/mp4', duration: a.duration }))
-    setVideos((prev) => [...prev, ...picked].slice(0, 3))
+    try {
+      const picked = await persistDraftAssets(result.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType ?? 'video/mp4', duration: a.duration })))
+      setVideos((prev) => [...prev, ...picked].slice(0, 3))
+    } catch {
+      Alert.alert('Chưa lưu được video', 'Không thể sao chép video vào bản nháp. Vui lòng thử lại.')
+    }
   }
 
   const removePhoto = (uri) => setPhotos((prev) => prev.filter((p) => p.uri !== uri))
   const removeVideo = (uri) => setVideos((prev) => prev.filter((v) => v.uri !== uri))
+  const makeCover = (index) => setPhotos((prev) => [prev[index], ...prev.filter((_, itemIndex) => itemIndex !== index)])
 
   const totalCount = photos.length + videos.length
 
@@ -96,16 +108,17 @@ export default function Capture({ navigation }) {
       <FlowHeader step={1} totalSteps={3} label="Chọn ảnh & video" onBack={() => navigation.goBack()} onCancel={() => navigation.popToTop()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Chọn ảnh & video căn nhà</Text>
+        <Text style={styles.eyebrow}>BƯỚC 1 · MEDIA</Text>
+        <Text style={styles.title}>Chọn góc đẹp nhất của bất động sản</Text>
         <Text style={styles.subtitle}>
-          Đã chọn <Text style={styles.subtitleStrong}>{photos.length} ảnh, {videos.length} video</Text> · ảnh đầu tiên là ảnh bìa
+          Đã chọn <Text style={styles.subtitleStrong}>{photos.length} ảnh, {videos.length} video</Text> · ảnh đầu tiên là ảnh bìa tin đăng
         </Text>
 
         <View style={styles.grid}>
           {photos.map((p, i) => (
-            <Pressable key={p.uri} style={[styles.tile, styles.photoTile]} onLongPress={() => removePhoto(p.uri)}>
+            <View key={p.uri} style={[styles.tile, styles.photoTile]}>
               <Image
-                source={{ uri: `data:${p.mimeType ?? 'image/jpeg'};base64,${p.base64}` }}
+                source={{ uri: p.base64 ? `data:${p.mimeType ?? 'image/jpeg'};base64,${p.base64}` : p.uri }}
                 style={styles.tileImage}
                 resizeMode="cover"
               />
@@ -117,7 +130,11 @@ export default function Capture({ navigation }) {
                   <Text style={styles.coverBadgeLabel}>BÌA</Text>
                 </View>
               )}
-            </Pressable>
+              {i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Đặt ảnh ${i + 1} làm ảnh bìa`} style={styles.makeCoverButton} onPress={() => makeCover(i)}><Ionicons name="star-outline" size={15} color="#fff" /></Pressable>}
+              <Pressable accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${i + 1}`} style={styles.removeButton} onPress={() => removePhoto(p.uri)}>
+                <Ionicons name="close" size={16} color="#fff" />
+              </Pressable>
+            </View>
           ))}
           {videos.map((v) => <VideoTile key={v.uri} video={v} onRemove={() => removeVideo(v.uri)} />)}
           {photos.length < 12 && (
@@ -134,15 +151,15 @@ export default function Capture({ navigation }) {
           )}
         </View>
 
-        {totalCount > 0 && <Text style={styles.hint}>Giữ để xoá</Text>}
+        {totalCount > 0 && <Text style={styles.hint}>Ảnh đầu tiên sẽ được dùng làm ảnh bìa.</Text>}
 
         <View style={styles.cameraTeaser}>
           <View style={styles.cameraIcon}>
             <Ionicons name="camera-outline" size={19} color={colors.amber[200]} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cameraTitle}>Chụp trong app với khung căn phòng</Text>
-            <Text style={styles.cameraSub}>Đường dẫn giúp canh thẳng & đủ sáng</Text>
+            <Text style={styles.cameraTitle}>Mẹo cho bộ ảnh rõ ràng</Text>
+            <Text style={styles.cameraSub}>Ưu tiên mặt tiền, phòng khách và không gian nổi bật.</Text>
           </View>
         </View>
       </ScrollView>
@@ -157,9 +174,9 @@ export default function Capture({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.sand[50] },
+  safe: { flex: 1, backgroundColor: colors.canvas },
   scroll: { padding: 20, paddingBottom: 120 },
-  title: { fontSize: 22, fontFamily: fonts.displayBold, color: colors.sand[900] },
+  eyebrow: { color: colors.jade[600], letterSpacing: 1.1, fontFamily: fonts.displayBold, fontSize: 10 }, title: { fontSize: 23, fontFamily: fonts.displayBold, color: colors.sand[900], marginTop: 4 },
   subtitle: { fontSize: 13, color: colors.sand[600], marginTop: 3 },
   subtitleStrong: { color: colors.sand[900], fontFamily: fonts.displaySemiBold },
   hint: { fontSize: 11, color: colors.sand[400], marginTop: 8 },
@@ -185,6 +202,8 @@ const styles = StyleSheet.create({
   tileNumLabel: { color: '#fff', fontFamily: fonts.monoBold, fontSize: 10 },
   coverBadge: { position: 'absolute', left: 6, bottom: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(26,23,18,0.7)', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 },
   coverBadgeLabel: { color: '#fff', fontFamily: fonts.displaySemiBold, fontSize: 9 },
+  removeButton: { position: 'absolute', right: 6, top: 6, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(16,23,19,0.72)', alignItems: 'center', justifyContent: 'center', zIndex: 4 },
+  makeCoverButton: { position: 'absolute', right: 6, bottom: 6, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(16,23,19,0.72)', alignItems: 'center', justifyContent: 'center', zIndex: 4 },
 
   videoTile: { backgroundColor: 'transparent' },
 
@@ -204,5 +223,5 @@ const styles = StyleSheet.create({
   cameraTitle: { fontSize: 13, fontFamily: fonts.displaySemiBold, color: colors.sand[50] },
   cameraSub: { fontSize: 11, color: colors.sand[400], marginTop: 1 },
 
-  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, paddingBottom: 30, backgroundColor: colors.sand[50] },
+  sticky: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, paddingBottom: 30, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.border },
 })

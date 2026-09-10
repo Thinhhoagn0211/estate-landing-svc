@@ -35,12 +35,24 @@ export const colors = {
     700: '#4c443a',
     900: '#1a1712',
   },
-  success: '#1a8a6f',
-  ai: '#c97d12',
-  error: '#c23b32',
-  errorBg: '#fbe9e7',
-  darkCanvas: '#14120f',
-  ink: '#2f2a23',
+  success: '#20623D',
+  warning: '#825500',
+  ai: '#8A562E',
+  aiBg: '#F4EBDD',
+  aiBorder: '#D9C3A4',
+  error: '#B42318',
+  errorBg: '#FCEDEA',
+  darkCanvas: '#101713',
+  ink: '#17211B',
+  surface: '#ffffff',
+  surfaceSubtle: '#EEF2EE',
+  canvas: '#F7F8F5',
+  border: '#DDE4DD',
+  borderControl: '#7A887E',
+  text: '#17211B',
+  textMuted: '#526158',
+  disabled: '#E5E9E5',
+  disabledText: '#66736B',
 }
 
 export const fonts = {
@@ -56,11 +68,11 @@ export const fonts = {
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 6: 24, 8: 32, 12: 48 }
 
-export const radius = { chip: 8, card: 12, sheet: 16, full: 999 }
+export const radius = { small: 8, control: 12, chip: 999, card: 16, sheet: 24, full: 999 }
 
 export const shadow = {
-  e1: { shadowColor: '#1a1712', shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  e2: { shadowColor: '#1a1712', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
-  e3: { shadowColor: '#1a1712', shadowOpacity: 0.3, shadowRadius: 28, shadowOffset: { width: 0, height: 12 }, elevation: 6 },
-  e4: { shadowColor: '#1a1712', shadowOpacity: 0.42, shadowRadius: 48, shadowOffset: { width: 0, height: 22 }, elevation: 10 },
+  e1: { shadowColor: '#17211B', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  e2: { shadowColor: '#17211B', shadowOpacity: 0.1, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
+  e3: { shadowColor: '#17211B', shadowOpacity: 0.16, shadowRadius: 28, shadowOffset: { width: 0, height: 14 }, elevation: 6 },
+  e4: { shadowColor: '#17211B', shadowOpacity: 0.22, shadowRadius: 42, shadowOffset: { width: 0, height: 20 }, elevation: 10 },
 }

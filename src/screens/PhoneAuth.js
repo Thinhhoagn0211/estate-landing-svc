@@ -36,7 +36,7 @@ export default function PhoneAuth() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <Text style={styles.title}>{mode === 'signin' ? 'Đăng nhập' : 'Tạo tài khoản'}</Text>
+        <Text style={styles.eyebrow}>NHÀ NÉT WORKSPACE</Text><Text style={styles.title}>{mode === 'signin' ? 'Chào mừng bạn trở lại' : 'Bắt đầu đăng tin đẹp hơn'}</Text>
         <Text style={styles.subtitle}>
           {mode === 'signin' ? 'Đăng nhập bằng email và mật khẩu.' : 'Tạo tài khoản mới bằng email và mật khẩu.'}
         </Text>
@@ -50,9 +50,10 @@ export default function PhoneAuth() {
           </Pressable>
         </View>
 
+        <Text style={styles.inputLabel}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="ten@congty.vn"
           placeholderTextColor={colors.sand[400]}
           autoCapitalize="none"
           autoCorrect={false}
@@ -60,9 +61,10 @@ export default function PhoneAuth() {
           value={email}
           onChangeText={setEmail}
         />
+        <Text style={styles.inputLabel}>Mật khẩu</Text>
         <TextInput
-          style={[styles.input, { marginTop: 12 }]}
-          placeholder="Mật khẩu (tối thiểu 6 ký tự)"
+          style={styles.input}
+          placeholder="Tối thiểu 6 ký tự"
           placeholderTextColor={colors.sand[400]}
           secureTextEntry
           value={password}
@@ -71,8 +73,8 @@ export default function PhoneAuth() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Button variant="primary" block disabled={!canSubmit} onPress={submit} style={{ marginTop: 20 }}>
-          {loading ? <ActivityIndicator color="#fff" /> : mode === 'signin' ? 'Đăng nhập' : 'Đăng ký'}
+        <Button variant="primary" block loading={loading} disabled={!canSubmit} onPress={submit} style={{ marginTop: 20 }}>
+          {mode === 'signin' ? 'Đăng nhập' : 'Đăng ký'}
         </Button>
       </View>
     </SafeAreaView>
@@ -80,8 +82,8 @@ export default function PhoneAuth() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 28, paddingTop: 74 },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  content: { padding: 24, paddingTop: 70 }, eyebrow: { color: colors.jade[600], letterSpacing: 1.1, fontFamily: fonts.displayBold, fontSize: 10 },
   title: { fontSize: 26, fontFamily: fonts.displayBold, color: colors.sand[900] },
   subtitle: { fontSize: 14, color: colors.sand[600], marginTop: 6 },
 
@@ -91,11 +93,12 @@ const styles = StyleSheet.create({
   segmentLabel: { fontFamily: fonts.displaySemiBold, fontSize: 13, color: colors.sand[600] },
   segmentLabelActive: { color: '#fff' },
 
+  inputLabel: { marginTop: 18, marginBottom: 7, color: colors.textMuted, fontFamily: fonts.displaySemiBold, fontSize: 12.5 },
   input: {
-    marginTop: 18,
-    borderWidth: 1.5,
-    borderColor: colors.sand[300],
-    borderRadius: radius.sheet,
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: colors.borderControl,
+    borderRadius: radius.control,
     padding: 14,
     fontSize: 16,
     fontFamily: fonts.displaySemiBold,

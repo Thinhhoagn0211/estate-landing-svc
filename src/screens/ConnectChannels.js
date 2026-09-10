@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { View, Text, Pressable, ActivityIndicator, Alert, StyleSheet, Switch, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import Button from '../components/Button'
 import { useAuth } from '../context/AuthContext'
@@ -22,6 +23,7 @@ export default function ConnectChannels({ navigation }) {
   const [disconnecting, setDisconnecting] = useState(null)
   const [error, setError] = useState(null)
   const [autoReply, setAutoReply] = useState({ enabled: false, reply_text: 'Cảm ơn bạn đã quan tâm. Chúng tôi sẽ phản hồi sớm nhất!' })
+  const [pageProfile, setPageProfile] = useState(null)
   const [savingAutoReply, setSavingAutoReply] = useState(false)
 
   const fetchConnections = useCallback(async () => {
@@ -32,6 +34,8 @@ export default function ConnectChannels({ navigation }) {
     setConnections(map)
     const { data: reply } = await supabase.from('messenger_auto_replies').select('enabled, reply_text').eq('user_id', user.id).maybeSingle()
     if (reply) setAutoReply(reply)
+    const { data: profile } = await supabase.from('facebook_page_profiles').select('fan_count, followers_count, webhook_subscribed, webhook_error, synced_at').eq('user_id', user.id).maybeSingle()
+    setPageProfile(profile ?? null)
   }, [user])
 
   useFocusEffect(
@@ -40,7 +44,7 @@ export default function ConnectChannels({ navigation }) {
     }, [fetchConnections])
   )
 
-  const canEnter = Object.keys(connections).length > 0
+  const canEnter = true
 
   const handleConnect = async (key) => {
     const connectFn = CONNECT_HANDLERS[key]
@@ -98,8 +102,8 @@ export default function ConnectChannels({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <Text style={styles.title}>Kết nối kênh đăng bài</Text>
-        <Text style={styles.subtitle}>Kết nối ít nhất 1 kênh để bắt đầu đăng bài.</Text>
+        <Text style={styles.eyebrow}>KÊNH ĐĂNG</Text><Text style={styles.title}>Nơi nội dung được xuất bản</Text>
+        <Text style={styles.subtitle}>Kết nối tài khoản để đăng trực tiếp. Bạn vẫn có thể lưu bản nháp khi chưa kết nối.</Text>
 
         <View style={styles.list}>
           {ORDER.map((key) => {
@@ -126,9 +130,18 @@ export default function ConnectChannels({ navigation }) {
                   isDisconnecting ? (
                     <ActivityIndicator color={colors.error} />
                   ) : (
-                    <Pressable style={styles.disconnectBtn} onPress={() => handleDisconnect(key)}>
-                      <Text style={styles.disconnectBtnLabel}>Ngắt kết nối</Text>
-                    </Pressable>
+                    <View style={styles.connectionActions}>
+                      {isConnecting ? (
+                        <ActivityIndicator color={colors.jade[600]} />
+                      ) : (
+                        <Pressable style={styles.permissionBtn} onPress={() => handleConnect(key)}>
+                          <Text style={styles.permissionBtnLabel}>Cấp lại quyền</Text>
+                        </Pressable>
+                      )}
+                      <Pressable style={styles.disconnectBtn} onPress={() => handleDisconnect(key)}>
+                        <Ionicons name="trash-outline" size={17} color={colors.error} />
+                      </Pressable>
+                    </View>
                   )
                 ) : meta.comingSoon ? null : isConnecting ? (
                   <ActivityIndicator color={colors.jade[600]} />
@@ -143,6 +156,12 @@ export default function ConnectChannels({ navigation }) {
         </View>
 
         {connections.facebook && (
+          <>
+          {!!pageProfile && <View style={styles.pageHealth}>
+            <Text style={styles.pageHealthTitle}>Tình trạng Facebook Page</Text>
+            <Text style={styles.pageHealthText}>{pageProfile.followers_count ?? pageProfile.fan_count ?? 0} người theo dõi · {pageProfile.webhook_subscribed ? 'Messenger đang nhận tin mới' : 'Webhook Messenger chưa hoạt động'}</Text>
+            {!pageProfile.webhook_subscribed && <Text style={styles.pageHealthHint}>{pageProfile.webhook_error || 'Nhấn Cấp lại quyền, sau đó mở Hiệu quả để kích hoạt đồng bộ Page.'}</Text>}
+          </View>}
           <View style={styles.autoReplyCard}>
             <View style={styles.autoReplyHead}>
               <View style={{ flex: 1 }}>
@@ -161,6 +180,7 @@ export default function ConnectChannels({ navigation }) {
               maxLength={1000}
             />
           </View>
+          </>
         )}
 
         {error && <Text style={styles.error}>{error}</Text>}
@@ -181,7 +201,7 @@ export default function ConnectChannels({ navigation }) {
             }
           }}
         >
-          {needsOnboarding ? 'Vào ứng dụng' : 'Xong'}
+          {needsOnboarding && !Object.keys(connections).length ? 'Bỏ qua và vào ứng dụng' : needsOnboarding ? 'Vào ứng dụng' : 'Xong'}
         </Button>
       </View>
     </SafeAreaView>
@@ -189,8 +209,8 @@ export default function ConnectChannels({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 28, paddingTop: 74 },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  content: { padding: 20, paddingTop: 28 }, eyebrow: { color: colors.jade[700], fontSize: 10, fontFamily: fonts.displayBold, letterSpacing: 1.1 },
   title: { fontSize: 26, fontFamily: fonts.displayBold, color: colors.sand[900] },
   subtitle: { fontSize: 14, color: colors.sand[600], marginTop: 6 },
 
@@ -203,8 +223,11 @@ const styles = StyleSheet.create({
   rowStatus: { fontSize: 12, color: colors.sand[500], marginTop: 1 },
   connectBtn: { borderWidth: 1, borderColor: colors.jade[500], paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.full },
   connectBtnLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.jade[600] },
-  disconnectBtn: { borderWidth: 1, borderColor: colors.sand[300], paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.full },
-  disconnectBtnLabel: { fontFamily: fonts.displaySemiBold, fontSize: 12, color: colors.error },
+  connectionActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  permissionBtn: { borderWidth: 1, borderColor: colors.jade[200], paddingVertical: 7, paddingHorizontal: 10, borderRadius: radius.full },
+  permissionBtnLabel: { fontFamily: fonts.displaySemiBold, fontSize: 11, color: colors.jade[700] },
+  disconnectBtn: { width: 34, height: 34, borderWidth: 1, borderColor: colors.sand[300], borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  pageHealth: { marginTop: 14, padding: 14, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, pageHealthTitle: { color: colors.text, fontFamily: fonts.displaySemiBold, fontSize: 13 }, pageHealthText: { marginTop: 4, color: colors.jade[700], fontSize: 12 }, pageHealthHint: { marginTop: 5, color: colors.warning, fontSize: 11, lineHeight: 16 },
 
   error: { marginTop: 16, fontSize: 13, color: colors.error, fontFamily: fonts.displayMedium },
   autoReplyCard: { marginTop: 20, borderRadius: radius.sheet, padding: 16, backgroundColor: colors.sand[100] },
@@ -213,5 +236,5 @@ const styles = StyleSheet.create({
   autoReplySub: { marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.sand[600] },
   autoReplyInput: { minHeight: 76, marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.sand[300], fontSize: 13, lineHeight: 18, color: colors.sand[900], textAlignVertical: 'top' },
 
-  sticky: { padding: 28, paddingTop: 0, paddingBottom: 30 },
+  sticky: { padding: 24, paddingTop: 0, paddingBottom: 30, backgroundColor: colors.canvas },
 })

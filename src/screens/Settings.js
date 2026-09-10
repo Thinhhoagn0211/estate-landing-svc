@@ -1,91 +1,77 @@
-import { useState } from 'react'
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../context/AuthContext'
 import { colors, fonts, radius } from '../theme/tokens'
 
-function Toggle({ on, onPress }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.toggle, on && styles.toggleOn]}>
-      <View style={[styles.toggleKnob, on && styles.toggleKnobOn]} />
-    </Pressable>
-  )
-}
+const ITEMS = [
+  { key: 'channels', icon: 'share-social-outline', title: 'Kênh đăng', subtitle: 'Quản lý Facebook Page đã kết nối', route: 'ConnectChannels' },
+]
 
 export default function Settings({ navigation }) {
   const { logout } = useAuth()
-  const [lang, setLang] = useState('vi')
-  const [pushOn, setPushOn] = useState(true)
-  const [goldenHourOn, setGoldenHourOn] = useState(true)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
-      <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-        <Ionicons name="chevron-back" size={20} color={colors.sand[900]} />
-      </Pressable>
-
-      <View style={styles.content}>
-        <Text style={styles.title}>Cài đặt</Text>
-
-        <Text style={styles.groupLabel}>Ngôn ngữ</Text>
-        <View style={styles.segment}>
-          <Pressable style={[styles.segmentItem, lang === 'vi' && styles.segmentItemActive]} onPress={() => setLang('vi')}>
-            <Text style={[styles.segmentLabel, lang === 'vi' && styles.segmentLabelActive]}>Tiếng Việt</Text>
-          </Pressable>
-          <Pressable style={[styles.segmentItem, lang === 'en' && styles.segmentItemActive]} onPress={() => setLang('en')}>
-            <Text style={[styles.segmentLabel, lang === 'en' && styles.segmentLabelActive]}>English</Text>
-          </Pressable>
-        </View>
-
-        <Text style={styles.groupLabel}>Kênh & thông báo</Text>
-        <View style={styles.card}>
-          <Pressable style={[styles.row, styles.rowBorder]} onPress={() => navigation.navigate('ConnectChannels')}>
-            <Text style={styles.rowLabel}>Kênh đã kết nối</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.sand[500]} />
-          </Pressable>
-          <View style={[styles.row, styles.rowBorder]}>
-            <Text style={styles.rowLabel}>Thông báo đẩy</Text>
-            <Toggle on={pushOn} onPress={() => setPushOn((v) => !v)} />
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Gợi ý giờ vàng</Text>
-            <Toggle on={goldenHourOn} onPress={() => setGoldenHourOn((v) => !v)} />
-          </View>
-        </View>
-
-        <Pressable onPress={logout}>
-          <Text style={styles.logout}>Đăng xuất</Text>
-        </Pressable>
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={styles.back} onPress={() => navigation.goBack()}><Ionicons name="chevron-back" size={21} color={colors.text} /></Pressable>
+        <Text style={styles.headerTitle}>Cài đặt</Text>
+        <View style={styles.spacer} />
       </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.overline}>TÙY CHỌN</Text>
+        <Text style={styles.title}>Quản lý không gian làm việc</Text>
+        <Text style={styles.subtitle}>Các cài đặt chỉ xuất hiện khi chúng được lưu và áp dụng thật.</Text>
+
+        <Text style={styles.groupLabel}>CÔNG VIỆC</Text>
+        <View style={styles.card}>
+          {ITEMS.map((item) => (
+            <Pressable key={item.key} style={({ pressed }) => [styles.row, pressed && styles.pressed]} onPress={() => navigation.navigate(item.route)}>
+              <View style={styles.rowIcon}><Ionicons name={item.icon} size={21} color={colors.jade[700]} /></View>
+              <View style={styles.rowCopy}><Text style={styles.rowTitle}>{item.title}</Text><Text style={styles.rowSubtitle}>{item.subtitle}</Text></View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.groupLabel}>PHIÊN ĐĂNG NHẬP</Text>
+        <View style={styles.sessionCard}>
+          <View style={styles.sessionIcon}><Ionicons name="shield-checkmark-outline" size={21} color={colors.jade[700]} /></View>
+          <View style={styles.sessionCopy}><Text style={styles.sessionTitle}>Tài khoản đang hoạt động</Text><Text style={styles.sessionText}>Bản nháp chưa đồng bộ có thể chỉ tồn tại trên thiết bị này.</Text></View>
+        </View>
+
+        <Pressable accessibilityRole="button" style={styles.logout} onPress={logout}><Ionicons name="log-out-outline" size={20} color={colors.error} /><Text style={styles.logoutText}>Đăng xuất</Text></Pressable>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.sand[50] },
-  back: { width: 38, height: 38, borderRadius: 19, marginLeft: 20, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, paddingTop: 6 },
-  title: { fontSize: 24, fontFamily: fonts.displayBold, color: colors.sand[900] },
-
-  groupLabel: { marginTop: 18, fontSize: 12, fontFamily: fonts.displaySemiBold, color: colors.sand[500], textTransform: 'uppercase', letterSpacing: 0.5 },
-  segment: { marginTop: 8, backgroundColor: '#fff', borderRadius: radius.sheet, padding: 5, flexDirection: 'row' },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10 },
-  segmentItemActive: { backgroundColor: colors.sand[900] },
-  segmentLabel: { fontFamily: fonts.displaySemiBold, fontSize: 13, color: colors.sand[600] },
-  segmentLabelActive: { color: '#fff' },
-
-  card: { marginTop: 8, backgroundColor: '#fff', borderRadius: radius.sheet, overflow: 'hidden' },
-  row: { paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.sand[100] },
-  rowLabel: { fontSize: 14, fontFamily: fonts.displayMedium, color: colors.sand[900] },
-
-  toggle: { width: 38, height: 22, borderRadius: 11, backgroundColor: colors.sand[300], justifyContent: 'center' },
-  toggleOn: { backgroundColor: colors.jade[500] },
-  toggleKnob: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', marginLeft: 2 },
-  toggleKnobOn: { marginLeft: 18 },
-
-  logout: { marginTop: 20, textAlign: 'center', fontSize: 13, fontFamily: fonts.displaySemiBold, color: colors.error },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  header: { paddingHorizontal: 20, paddingTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  back: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: colors.text, fontFamily: fonts.displaySemiBold, fontSize: 15 },
+  spacer: { width: 48 },
+  content: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 40 },
+  overline: { color: colors.jade[700], fontFamily: fonts.displayBold, fontSize: 10, letterSpacing: 1.1 },
+  title: { marginTop: 4, color: colors.text, fontFamily: fonts.displayBold, fontSize: 25, lineHeight: 32 },
+  subtitle: { marginTop: 6, color: colors.textMuted, fontSize: 12.5, lineHeight: 18 },
+  groupLabel: { marginTop: 30, marginBottom: 10, color: colors.textMuted, fontFamily: fonts.displayBold, fontSize: 10, letterSpacing: 0.9 },
+  card: { borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' },
+  row: { minHeight: 76, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pressed: { opacity: 0.76 },
+  rowIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.jade[50], alignItems: 'center', justifyContent: 'center' },
+  rowCopy: { flex: 1 },
+  rowTitle: { color: colors.text, fontFamily: fonts.displaySemiBold, fontSize: 14 },
+  rowSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: 11.5 },
+  sessionCard: { padding: 15, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  sessionIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.jade[50], alignItems: 'center', justifyContent: 'center' },
+  sessionCopy: { flex: 1 },
+  sessionTitle: { color: colors.text, fontFamily: fonts.displaySemiBold, fontSize: 13.5 },
+  sessionText: { marginTop: 3, color: colors.textMuted, fontSize: 11.5, lineHeight: 17 },
+  logout: { marginTop: 18, minHeight: 52, borderRadius: radius.control, borderWidth: 1, borderColor: '#E7B9B3', backgroundColor: colors.errorBg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  logoutText: { color: colors.error, fontFamily: fonts.displaySemiBold, fontSize: 14 },
 })

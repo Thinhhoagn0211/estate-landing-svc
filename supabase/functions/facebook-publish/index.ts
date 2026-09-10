@@ -90,7 +90,25 @@ Deno.serve(async (req) => {
       return json({ error: feedResult.error?.message ?? 'Facebook đăng bài thất bại' }, 400)
     }
 
-    return json({ success: true, postId: feedResult.id, pageName: channel.display_name, imageCount: uploadedPhotoIds.length })
+    let postUrl: string | null = null
+    try {
+      const postDetails = await fetch(
+        `${baseUrl}/${feedResult.id}?fields=permalink_url`,
+        { headers: { Authorization: `Bearer ${pageToken}` } },
+      )
+      const postPayload = await postDetails.json()
+      if (postDetails.ok && !postPayload.error) postUrl = postPayload.permalink_url ?? null
+    } catch (error) {
+      console.warn('facebook permalink lookup failed:', error)
+    }
+
+    return json({
+      success: true,
+      postId: feedResult.id,
+      postUrl,
+      pageName: channel.display_name,
+      imageCount: uploadedPhotoIds.length,
+    })
   } catch (error) {
     console.error('facebook-publish error:', error)
     return json({ error: error?.message ?? String(error) }, 500)

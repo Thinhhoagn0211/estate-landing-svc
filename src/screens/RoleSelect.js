@@ -19,7 +19,7 @@ export default function RoleSelect({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <Text style={styles.title}>Bạn là ai?</Text>
+        <Text style={styles.eyebrow}>CÁ NHÂN HOÁ WORKSPACE</Text><Text style={styles.title}>Bạn làm bất động sản theo cách nào?</Text>
         <Text style={styles.subtitle}>Giúp chúng tôi tuỳ chỉnh trải nghiệm phù hợp.</Text>
 
         <View style={styles.cards}>
@@ -50,8 +50,8 @@ export default function RoleSelect({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 28, paddingTop: 74 },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  content: { padding: 24, paddingTop: 64 }, eyebrow: { color: colors.jade[600], letterSpacing: 1.1, fontSize: 10, fontFamily: fonts.displayBold },
   title: { fontSize: 26, fontFamily: fonts.displayBold, color: colors.sand[900] },
   subtitle: { fontSize: 14, color: colors.sand[600], marginTop: 6 },
 
@@ -63,5 +63,5 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontFamily: fonts.displayBold, color: colors.sand[900] },
   cardDesc: { fontSize: 12.5, color: colors.sand[600], marginTop: 2 },
 
-  sticky: { padding: 28, paddingTop: 0, paddingBottom: 30 },
+  sticky: { padding: 24, paddingTop: 0, paddingBottom: 30, backgroundColor: colors.canvas },
 })

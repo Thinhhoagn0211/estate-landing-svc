@@ -19,6 +19,16 @@ module.exports = {
       'expo-dev-client',
       'expo-video',
       [
+        'expo-build-properties',
+        {
+          android: {
+            manifestQueries: {
+              package: ['com.facebook.orca'],
+            },
+          },
+        },
+      ],
+      [
         'react-native-fbsdk-next',
         {
           appID: facebookAppId,

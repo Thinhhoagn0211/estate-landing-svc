@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Query Supabase database
+      - name: Keep active and prune expired data
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -37,4 +37,15 @@ jobs:
             --header 'Accept: application/json' \
             --output /dev/null
 
-          echo 'Supabase database activity ping succeeded.'
+          curl --fail --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --request POST "$SUPABASE_URL/rest/v1/rpc/prune_expired_app_data" \
+            --header "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            --header 'Content-Type: application/json' \
+            --data '{}'
+
+          echo 'Supabase activity ping and expired-data cleanup succeeded.'

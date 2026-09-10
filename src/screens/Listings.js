@@ -1,108 +1,110 @@
-import { useCallback, useState } from 'react'
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native'
-import { Image } from 'expo-image'
+import { useCallback, useMemo, useState } from 'react'
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import TabBar from '../components/TabBar'
+import ListingCard from '../components/ListingCard'
 import { useAuth } from '../context/AuthContext'
+import { useListingDraft } from '../context/ListingDraftContext'
 import { supabase } from '../lib/supabase'
-import { colors, fonts, radius, shadow } from '../theme/tokens'
+import { colors, fonts, radius } from '../theme/tokens'
 
-const FILTERS = ['Tất cả', 'Bán', 'Cho thuê', 'Nháp']
+const FILTERS = [
+  { key: 'all', label: 'Tất cả' }, { key: 'active', label: 'Đang chào' },
+  { key: 'draft', label: 'Bản nháp' }, { key: 'closed', label: 'Đã giao dịch' },
+  { key: 'archived', label: 'Lưu trữ' },
+]
+const SORTS = [
+  { key: 'updated', label: 'Mới cập nhật' }, { key: 'created', label: 'Mới tạo' },
+  { key: 'priceAsc', label: 'Giá tăng' }, { key: 'priceDesc', label: 'Giá giảm' },
+]
 
-function formatPrice(l) {
-  if (!l.price) return '—'
-  return l.deal_type === 'rent' ? `${l.price} tr/tháng` : `${l.price} tỷ`
+function normalize(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
 }
 
-function coverUrl(listing) {
-  return Array.isArray(listing.photo_urls) ? listing.photo_urls.find(Boolean) : null
+function numericPrice(value) {
+  const normalized = String(value ?? '').replace(',', '.').replace(/[^\d.]/g, '')
+  return Number.parseFloat(normalized) || 0
 }
 
-export default function Listings({ navigation }) {
+export default function Listings({ navigation, route }) {
   const { user } = useAuth()
-  const [filter, setFilter] = useState(FILTERS[0])
+  const { loadFromListing } = useListingDraft()
+  const selectMode = !!route.params?.selectMode
+  const [filter, setFilter] = useState('all')
+  const [sort, setSort] = useState('updated')
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [query, setQuery] = useState('')
 
-  const fetchListings = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!user) return
-    const { data } = await supabase.from('listings').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    setListings(data ?? [])
+    setError(null)
+    const { data, error: queryError } = await supabase.from('listings').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    if (queryError) setError('Chưa thể tải danh sách bất động sản.')
+    if (data) setListings(data)
     setLoading(false)
   }, [user])
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchListings()
-    }, [fetchListings])
-  )
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
-  const filtered = listings.filter((l) => {
-    if (filter === 'Bán') return l.deal_type === 'sale'
-    if (filter === 'Cho thuê') return l.deal_type === 'rent'
-    if (filter === 'Nháp') return l.status === 'draft'
-    return true
-  })
+  const filtered = useMemo(() => {
+    const needle = normalize(query.trim())
+    const result = listings.filter((item) => {
+      const propertyStatus = item.property_status || 'active'
+      if (filter === 'active' && propertyStatus !== 'active') return false
+      if (filter === 'draft' && item.status !== 'draft') return false
+      if (filter === 'closed' && !['sold', 'rented'].includes(propertyStatus)) return false
+      if (filter === 'archived' && propertyStatus !== 'archived') return false
+      return !needle || normalize(`${item.title ?? ''} ${item.address ?? ''} ${item.id ?? ''}`).includes(needle)
+    })
+    return result.sort((a, b) => {
+      if (sort === 'priceAsc' || sort === 'priceDesc') {
+        if (a.deal_type !== b.deal_type) return a.deal_type.localeCompare(b.deal_type)
+        const difference = numericPrice(a.price) - numericPrice(b.price)
+        return sort === 'priceAsc' ? difference : -difference
+      }
+      const field = sort === 'created' ? 'created_at' : 'updated_at'
+      return new Date(b[field] || b.created_at) - new Date(a[field] || a.created_at)
+    })
+  }, [filter, listings, query, sort])
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={styles.head}>
-        <View style={styles.headRow}>
-          <Text style={styles.title}>Tin đăng</Text>
-          <Pressable style={styles.statsBtn} onPress={() => navigation.navigate('Analytics')}>
-            <Ionicons name="stats-chart-outline" size={18} color={colors.sand[700]} />
-          </Pressable>
-        </View>
-        <View style={styles.search}>
-          <Ionicons name="search" size={16} color={colors.sand[500]} />
-          <Text style={styles.searchPlaceholder}>Tìm theo khu vực, giá, mã tin…</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-          {FILTERS.map((f) => (
-            <Pressable key={f} onPress={() => setFilter(f)} style={[styles.filterChip, filter === f && styles.filterChipActive]}>
-              <Text style={[styles.filterLabel, filter === f && styles.filterLabelActive]}>
-                {f === 'Tất cả' ? `${f} · ${listings.length}` : f}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+  const selectListing = (item) => {
+    if (!selectMode) return navigation.navigate('ListingDetail', { id: item.id })
+    loadFromListing(item)
+    navigation.navigate('AiGeneration')
+  }
+
+  const cycleSort = () => {
+    const index = SORTS.findIndex((item) => item.key === sort)
+    setSort(SORTS[(index + 1) % SORTS.length].key)
+  }
+
+  return <SafeAreaView style={styles.safe} edges={['top']}>
+    <StatusBar style="dark" />
+    <View style={styles.header}>
+      <View style={styles.titleRow}>
+        {selectMode && <Pressable accessibilityLabel="Quay lại" style={styles.back} onPress={() => navigation.goBack()}><Ionicons name="chevron-back" size={21} color={colors.text} /></Pressable>}
+        <View style={styles.titleCopy}><Text style={styles.overline}>{selectMode ? 'CHỌN HỒ SƠ' : 'DANH MỤC CỦA BẠN'}</Text><Text style={styles.title}>{selectMode ? 'Dùng tài sản đã lưu' : 'Bất động sản'}</Text><Text style={styles.subtitle}>{loading ? 'Đang cập nhật' : `${listings.length} tài sản`}</Text></View>
+        {!selectMode && <Pressable accessibilityRole="button" accessibilityLabel="Tạo bất động sản mới" style={styles.createButton} onPress={() => navigation.navigate('StartCreate')}><Ionicons name="add" size={22} color="#fff" /></Pressable>}
       </View>
-
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {!loading && filtered.length === 0 && <Text style={styles.emptyText}>Không có tin đăng nào.</Text>}
-        {filtered.map((l) => {
-          const isDraft = l.status === 'draft'
-          return (
-            <Pressable
-              key={l.id}
-              style={[styles.card, isDraft && { opacity: 0.65 }]}
-              onPress={() => navigation.navigate('ListingDetail', { id: l.id })}
-            >
-              <View style={[styles.thumb, { backgroundColor: colors.sand[200] }]}>
-                {coverUrl(l) && <Image source={{ uri: coverUrl(l) }} style={styles.thumbImage} contentFit="cover" cachePolicy="disk" />}
-                <View style={[styles.badge, { backgroundColor: isDraft ? colors.sand[500] : colors.jade[500] }]}>
-                  <Text style={styles.badgeLabel}>{isDraft ? 'NHÁP' : 'LIVE'}</Text>
-                </View>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.price}>{formatPrice(l)}</Text>
-                <Text style={styles.loc} numberOfLines={1}>
-                  {[l.address, l.area ? `${l.area}m²` : null, l.bedrooms ? `${l.bedrooms}PN` : null].filter(Boolean).join(' · ') || '—'}
-                </Text>
-                {isDraft && <Text style={styles.hint}>Chưa hoàn tất thông tin</Text>}
-              </View>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
-
-      <TabBar active="listings" onNavigate={(k) => navigateTab(navigation, k)} onCreate={() => navigation.navigate('Capture')} />
-    </SafeAreaView>
-  )
+      <View style={styles.search}><Ionicons name="search-outline" size={19} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="Tìm tên, địa chỉ hoặc mã tài sản" placeholderTextColor={colors.textMuted} style={styles.searchInput} />{!!query && <Pressable accessibilityLabel="Xóa tìm kiếm" onPress={() => setQuery('')} style={styles.clear}><Ionicons name="close-circle" size={19} color={colors.textMuted} /></Pressable>}</View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{FILTERS.map((item) => { const active = filter === item.key; return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} key={item.key} onPress={() => setFilter(item.key)} style={[styles.filter, active && styles.filterActive]}><Text style={[styles.filterText, active && styles.filterTextActive]}>{item.label}</Text></Pressable> })}</ScrollView>
+    </View>
+    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <View style={styles.resultRow}><Text style={styles.resultText}>{loading ? 'Đang tải…' : `${filtered.length} kết quả`}</Text><Pressable style={styles.sortButton} onPress={cycleSort}><Ionicons name="swap-vertical-outline" size={17} color={colors.jade[700]} /><Text style={styles.sortText}>{SORTS.find((item) => item.key === sort)?.label}</Text></Pressable></View>
+      {selectMode && !loading && <Text style={styles.selectHint}>Chọn một tài sản để mở lại nội dung đã lưu và tiếp tục biên tập.</Text>}
+      {loading && <ActivityIndicator color={colors.jade[700]} style={styles.loading} />}
+      {!loading && error && <Pressable style={styles.error} onPress={load}><Text style={styles.errorText}>{error}</Text><Text style={styles.retry}>Thử lại</Text></Pressable>}
+      {!loading && !error && filtered.map((item) => <ListingCard key={item.id} listing={item} onPress={() => selectListing(item)} />)}
+      {!loading && !error && filtered.length === 0 && <View style={styles.empty}><View style={styles.emptyIcon}><Ionicons name={query || filter !== 'all' ? 'options-outline' : 'business-outline'} size={24} color={colors.jade[700]} /></View><Text style={styles.emptyTitle}>{query || filter !== 'all' ? 'Không có tài sản phù hợp' : 'Chưa có bất động sản'}</Text><Text style={styles.emptyText}>{query || filter !== 'all' ? 'Thử từ khóa khác hoặc xóa bộ lọc đang dùng.' : 'Lưu tài sản đầu tiên để bắt đầu tạo nội dung.'}</Text><Pressable style={styles.emptyButton} onPress={() => query || filter !== 'all' ? (setQuery(''), setFilter('all')) : navigation.navigate('StartCreate')}><Text style={styles.emptyButtonText}>{query || filter !== 'all' ? 'Xóa bộ lọc' : 'Tạo tin mới'}</Text></Pressable></View>}
+    </ScrollView>
+    {!selectMode && <TabBar active="listings" onNavigate={(key) => navigateTab(navigation, key)} />}
+  </SafeAreaView>
 }
 
 function navigateTab(navigation, key) {
@@ -113,32 +115,12 @@ function navigateTab(navigation, key) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.sand[50] },
-  head: { paddingHorizontal: 20 },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 26, fontFamily: fonts.displayBold, color: colors.sand[900] },
-  statsBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.e1 },
-
-  search: { marginTop: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.sand[300], borderRadius: radius.card, paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchPlaceholder: { fontSize: 13, color: colors.sand[500] },
-
-  filterRow: { marginTop: 12 },
-  filterChip: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.sand[300], paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.full, marginRight: 8 },
-  filterChipActive: { backgroundColor: colors.sand[900], borderColor: colors.sand[900] },
-  filterLabel: { fontFamily: fonts.displayMedium, fontSize: 12.5, color: colors.sand[700] },
-  filterLabelActive: { color: '#fff', fontFamily: fonts.displaySemiBold },
-
-  list: { padding: 20, paddingTop: 14, paddingBottom: 120, gap: 12 },
-  emptyText: { fontSize: 13, color: colors.sand[500], textAlign: 'center', marginTop: 40 },
-  card: { backgroundColor: '#fff', borderRadius: radius.sheet, padding: 12, flexDirection: 'row', gap: 12, ...shadow.e1 },
-  thumb: { width: 76, height: 76, borderRadius: 12, overflow: 'hidden' },
-  thumbImage: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
-  badge: { position: 'absolute', top: 5, left: 5, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 },
-  badgeLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 8 },
-  price: { fontSize: 15, fontFamily: fonts.displayBold, color: colors.sand[900] },
-  loc: { fontSize: 12, color: colors.sand[600], marginTop: 1 },
-  hint: { fontSize: 11.5, color: colors.sand[500], marginTop: 6 },
-  metaRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 11.5, color: colors.sand[500] },
+  safe: { flex: 1, backgroundColor: colors.canvas }, header: { paddingHorizontal: 20, paddingTop: 8 }, titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }, titleCopy: { flex: 1 },
+  overline: { color: colors.jade[700], fontFamily: fonts.displayBold, fontSize: 10, letterSpacing: 1.1 }, title: { marginTop: 2, color: colors.text, fontFamily: fonts.displayBold, fontSize: 27 }, subtitle: { marginTop: 2, color: colors.textMuted, fontSize: 12.5 },
+  back: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, createButton: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.jade[800], alignItems: 'center', justifyContent: 'center' },
+  search: { marginTop: 18, minHeight: 52, borderRadius: radius.control, borderWidth: 1, borderColor: colors.borderControl, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 9 }, searchInput: { flex: 1, fontFamily: fonts.display, color: colors.text, fontSize: 15, paddingVertical: 0 }, clear: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  filters: { paddingTop: 12, paddingBottom: 14, gap: 8 }, filter: { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, filterActive: { backgroundColor: colors.jade[800], borderColor: colors.jade[800] }, filterText: { color: colors.textMuted, fontFamily: fonts.displayMedium, fontSize: 12.5 }, filterTextActive: { color: '#fff', fontFamily: fonts.displaySemiBold },
+  list: { paddingHorizontal: 20, paddingBottom: 110, gap: 14 }, resultRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, resultText: { color: colors.textMuted, fontSize: 12.5 }, sortButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5 }, sortText: { color: colors.jade[700], fontFamily: fonts.displaySemiBold, fontSize: 12 }, selectHint: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginBottom: 2 },
+  loading: { marginTop: 36 }, error: { padding: 16, borderRadius: radius.control, backgroundColor: colors.errorBg, flexDirection: 'row', gap: 10 }, errorText: { flex: 1, color: colors.error, fontSize: 12.5 }, retry: { color: colors.error, fontFamily: fonts.displayBold, fontSize: 12.5 },
+  empty: { marginTop: 28, padding: 24, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' }, emptyIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: colors.jade[50], alignItems: 'center', justifyContent: 'center' }, emptyTitle: { marginTop: 15, color: colors.text, fontFamily: fonts.displayBold, fontSize: 16 }, emptyText: { marginTop: 5, color: colors.textMuted, fontSize: 12.5, lineHeight: 18, textAlign: 'center', maxWidth: 270 }, emptyButton: { marginTop: 17, minHeight: 48, borderRadius: radius.control, backgroundColor: colors.jade[700], paddingHorizontal: 17, alignItems: 'center', justifyContent: 'center' }, emptyButtonText: { color: '#fff', fontFamily: fonts.displaySemiBold, fontSize: 13.5 },
 })

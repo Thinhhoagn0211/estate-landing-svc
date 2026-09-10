@@ -1,7 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../context/AuthContext'
 import { colors, fonts, radius } from '../theme/tokens'
@@ -17,33 +16,27 @@ export default function EmptyState({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <LinearGradient colors={[colors.jade[500], colors.jade[700]]} style={styles.iconTile}>
-          <Ionicons name="camera" size={52} color="#fff" />
-        </LinearGradient>
-        <Text style={styles.title}>Chưa có tin đăng nào</Text>
+        <View style={styles.iconTile}>
+          <Ionicons name="scan-outline" size={42} color="#fff" />
+        </View>
+        <Text style={styles.eyebrow}>KHÔNG GIAN ĐÃ SẴN SÀNG</Text><Text style={styles.title}>Bắt đầu với bất động sản đầu tiên</Text>
         <Text style={styles.subtitle}>
-          Chụp vài tấm ảnh căn hộ — AI sẽ lo phần caption, video và đăng bài. Bài đầu tiên chỉ mất khoảng 3 phút.
+          Thêm ảnh, nhập thông tin và duyệt nội dung trước khi chọn nơi đăng.
         </Text>
         <Pressable style={styles.cta} onPress={finish}>
-          <Text style={styles.ctaLabel}>Tạo bài đăng đầu tiên</Text>
+          <Text style={styles.ctaLabel}>Vào không gian làm việc</Text>
         </Pressable>
-        <View style={styles.tutorial}>
-          <Ionicons name="help-circle-outline" size={15} color={colors.sand[500]} />
-          <Text style={styles.tutorialLabel}>Xem video hướng dẫn 40 giây</Text>
-        </View>
       </View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.sand[50] },
-  content: { flex: 1, paddingHorizontal: 32, paddingTop: 40, alignItems: 'center' },
-  iconTile: { width: 120, height: 120, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginTop: 36 },
-  title: { fontSize: 22, fontFamily: fonts.displayBold, color: colors.sand[900], marginTop: 26 },
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  content: { flex: 1, paddingHorizontal: 32, paddingTop: 40, alignItems: 'center' }, eyebrow: { color: colors.jade[600], fontFamily: fonts.displayBold, fontSize: 10, letterSpacing: 1.1, marginTop: 26 },
+  iconTile: { width: 104, height: 104, borderRadius: 30, backgroundColor: colors.jade[900], alignItems: 'center', justifyContent: 'center', marginTop: 36 },
+  title: { fontSize: 22, fontFamily: fonts.displayBold, color: colors.sand[900], marginTop: 6, textAlign: 'center' },
   subtitle: { fontSize: 14, lineHeight: 21, color: colors.sand[600], marginTop: 8, textAlign: 'center', maxWidth: 270 },
-  cta: { marginTop: 26, backgroundColor: colors.jade[500], paddingVertical: 15, paddingHorizontal: 26, borderRadius: radius.sheet },
+  cta: { marginTop: 26, minHeight: 54, justifyContent: 'center', backgroundColor: colors.jade[700], paddingHorizontal: 22, borderRadius: radius.control },
   ctaLabel: { color: '#fff', fontFamily: fonts.displayBold, fontSize: 16 },
-  tutorial: { marginTop: 30, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tutorialLabel: { fontSize: 12.5, color: colors.sand[500] },
 })
